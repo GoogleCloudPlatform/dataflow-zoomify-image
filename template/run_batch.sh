@@ -27,4 +27,4 @@ python batch-tile-images.py --input gs://$BUCKET/$INPUT_FOLDER/**.jpg \
  --region=$REGION \
  --staging_location=gs://$BUCKET/$STAGING_FOLDER \
  --temp_location=gs://$BUCKET/$TEMP_FOLDER \
- --job_name=cria-job
+ --job_name=$JOB_NAME
