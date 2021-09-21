@@ -21,3 +21,4 @@ export OUTPUT_FOLDER=your/output/folder
 export NUM_WORKERS=10
 export STAGING_FOLDER=staging
 export TEMP_FOLDER=tmp
+export GOOGLE_APPLICATION_CREDENTIALS=/your/key/path.json
