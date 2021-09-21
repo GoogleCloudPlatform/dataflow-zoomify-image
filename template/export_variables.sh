@@ -13,12 +13,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-export PROJECT=your-project
-export REGION=us-central1
-export BUCKET=your-bucket
-export INPUT_FOLDER=your/input/folder
-export OUTPUT_FOLDER=your/output/folder
-export NUM_WORKERS=10
-export STAGING_FOLDER=staging
-export TEMP_FOLDER=tmp
-export GOOGLE_APPLICATION_CREDENTIALS=/your/key/path.json
+PROJECT=your-project
+REGION=us-central1
+BUCKET=your-bucket
+INPUT_FOLDER=your/input/folder
+OUTPUT_FOLDER=your/output/folder
+NUM_WORKERS=10
+STAGING_FOLDER=staging
+TEMP_FOLDER=tmp
+GOOGLE_APPLICATION_CREDENTIALS=/your/key/path.json
+JOB_NAME=job-name

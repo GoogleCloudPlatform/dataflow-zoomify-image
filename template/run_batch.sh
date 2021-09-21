@@ -13,6 +13,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+source venv/bin/activate
+
+source export_variables.sh
 
 python batch-tile-images.py --input gs://$BUCKET/$INPUT_FOLDER/**.jpg \
  --output gs://$BUCKET/$OUTPUT_FOLDER/ \
@@ -22,6 +25,6 @@ python batch-tile-images.py --input gs://$BUCKET/$INPUT_FOLDER/**.jpg \
  --num-workers=$NUM_WORKERS \
  --project=$PROJECT \
  --region=$REGION \
- --staging_location=gs://$BUCKET/cria-staging \
- --temp_location=gs://$BUCKET/cria-tmp \
+ --staging_location=gs://$BUCKET/$STAGING_FOLDER \
+ --temp_location=gs://$BUCKET/$TEMP_FOLDER \
  --job_name=cria-job

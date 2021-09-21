@@ -5,9 +5,9 @@ This repository contains a Dataflow template that can be used to tile images fro
 ## How to use this template
 
 1. Clone it from GitHub.
-1. Edit the `template/export_variables.sh` file with your variables
-1. The service account used in GOOGLE_APPLICATION_CREDENTIALS need the right permissions (Dataflow and Cloud Storage)
-1. Enter template and run `export_variables.sh`, `venv_prepare.sh` to prepare the environment
+1. Edit the `export_variables.sh` file inside the `template` folder with your variables
+1. The service account used in GOOGLE_APPLICATION_CREDENTIALS needs the right permissions (Dataflow and Cloud Storage)
+1. Enter the `template` folder and run `venv_prepare.sh` to prepare the environment
 1. Run `run_batch.sh` to start the Dataflow pipeline.
 ##
 
