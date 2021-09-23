@@ -22,7 +22,7 @@ python batch-tile-images.py --input gs://$BUCKET/$INPUT_FOLDER/**.jpg \
  --requirements_file requirements.txt \
  --runner=DataflowRunner \
  --autoscaling_algorithm=NONE \
- --num-workers=$NUM_WORKERS \
+ --num_workers=$NUM_WORKERS \
  --project=$PROJECT \
  --region=$REGION \
  --staging_location=gs://$BUCKET/$STAGING_FOLDER \
