@@ -83,7 +83,7 @@ def process_tiles(el, output):
                 "tier_number": tier_number,
                 "item": item,
                 "tile_group": next(tile_group),
-                "output": output+el["name"]+"/",
+                "output": output+el["name"],
                 "name": el["name"]
             }
 
@@ -94,7 +94,7 @@ def save_tile(el):
     item = el["item"]
     tile_group = el["tile_group"]
     output = el["output"]
-    path = f"{output}/TileGroup-{tile_group}-{tier_number}-{item[0]}-{item[1]}.jpg"
+    path = f"{output}/TileGroup{tile_group}/{tier_number}-{item[1]}-{item[0]}.jpg"
 
     f = io.BytesIO()
     # gcs.open(path, 'w', mime_type="image/jpeg")
