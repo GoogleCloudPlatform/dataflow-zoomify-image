@@ -75,7 +75,7 @@ def process_tiles(el, output):
     im = el["image"]    
     tier = math.ceil(max([math.log(shape/256, 2) for shape in im.shape]))
     max_step = 2 ** tier
-    steps = [int(max_step/2**i) for i in range(tier)]
+    steps = [int(max_step/2**i) for i in range(tier + 1)]
     tiers = [im[::step, ::step] for step in steps]
     def next_i():
         i = 0
