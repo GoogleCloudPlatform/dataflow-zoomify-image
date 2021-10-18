@@ -109,8 +109,8 @@ def save_tile(el):
         imageio.imwrite(
             #f"image/TileGroup-{next(tile_group)}-{tier_number}-{item[0]}-{item[1]}.jpg",
             f,
-            tier[item[0]*256:min(tier.shape[0],item[0]*256+256), item[1]*256:min(tier.shape[1],item[1]*256+256)],
-            pilmode='RGB', format="JPG", quality=80)
+            tier[item[0]*256:min(tier.shape[0],item[0]*256+256), item[1]*256:min(tier.shape[1],item[1]*256+256), :3],
+            format="JPG", quality=80)
         return [(path, f.getvalue())]
     except ValueError as e:
         print(e)
