@@ -59,10 +59,17 @@ class UploadGCS(beam.DoFn):
     def finish_bundle(self):
         self.executor.shutdown()
 
+def by_extension(el, extensions):
+  ext = el.path.split('.')[-1]
+  return ext in extensions
 
 def img_read(path):
+    kwargs = {}
+    ext = path.split('.')[-1]
+    if ext == 'png':
+        kwargs['pilmode'] = 'RGB' # discard alpha channel
     gcs = gcsio.GcsIO()
-    return {"image": imageio.imread(gcs.open(path)), "name": path.split("/")[-1]}
+    return {"image": imageio.imread(gcs.open(path), **kwargs), "name": path.split("/")[-1]}
 
 def process_tiles(el, output):
     im = el["image"]    
@@ -83,7 +90,7 @@ def process_tiles(el, output):
                 "tier_number": tier_number,
                 "item": item,
                 "tile_group": next(tile_group),
-                "output": output+el["name"]+"/",
+                "output": output+el["name"],
                 "name": el["name"]
             }
 
@@ -94,7 +101,7 @@ def save_tile(el):
     item = el["item"]
     tile_group = el["tile_group"]
     output = el["output"]
-    path = f"{output}/TileGroup-{tile_group}-{tier_number}-{item[0]}-{item[1]}.jpg"
+    path = f"{output}/TileGroup{tile_group}/{tier_number}-{item[1]}-{item[0]}.jpg"
 
     f = io.BytesIO()
     # gcs.open(path, 'w', mime_type="image/jpeg")
@@ -102,8 +109,8 @@ def save_tile(el):
         imageio.imwrite(
             #f"image/TileGroup-{next(tile_group)}-{tier_number}-{item[0]}-{item[1]}.jpg",
             f,
-            tier[item[0]*256:min(tier.shape[0],item[0]*256+256), item[1]*256:min(tier.shape[1],item[1]*256+256)],
-            format="JPG")
+            tier[item[0]*256:min(tier.shape[0],item[0]*256+256), item[1]*256:min(tier.shape[1],item[1]*256+256), :3],
+            format="JPG", quality=80)
         return [(path, f.getvalue())]
     except ValueError as e:
         print(e)
@@ -122,16 +129,24 @@ def main(argv=None, save_main_session=True):
       dest='output',
       default='gs://YOUR_OUTPUT_BUCKET/AND_OUTPUT_PREFIX',
       help='Output file to write results to.')
+  parser.add_argument(
+      '--extensions',
+      dest='extensions',
+      default='jpg',
+      help='File extensions to be processed.')
   known_args, pipeline_args = parser.parse_known_args(argv)
 
   pipeline_options = PipelineOptions(pipeline_args)
   pipeline_options.view_as(SetupOptions).save_main_session = save_main_session
+
+  valid_extensions = known_args.extensions.split(',')
 
   with beam.Pipeline(options=pipeline_options) as p:
     # Read the text file[pattern] into a PCollection.
     files = p | MatchFiles(known_args.input)
     (
         files
+        | 'Filter by file extension' >> beam.Filter(by_extension, valid_extensions)
         | 'Read images to arrays' >> beam.Map(lambda x: img_read(x.path))
         | 'Tile images' >> beam.ParDo(process_tiles, known_args.output)
         | 'Save tile' >> beam.ParDo(save_tile)

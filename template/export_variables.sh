@@ -18,6 +18,7 @@ REGION=us-central1
 BUCKET=your-bucket
 INPUT_FOLDER=your/input/folder
 OUTPUT_FOLDER=your/output/folder
+FILE_EXTENSIONS=jpg,png,tif
 NUM_WORKERS=10
 STAGING_FOLDER=staging
 TEMP_FOLDER=tmp

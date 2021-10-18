@@ -19,6 +19,7 @@ source export_variables.sh
 
 python batch-tile-images.py --input gs://$BUCKET/$INPUT_FOLDER/**.jpg \
  --output gs://$BUCKET/$OUTPUT_FOLDER/ \
+ --extensions=$FILE_EXTENSIONS \
  --requirements_file requirements.txt \
  --runner=DataflowRunner \
  --autoscaling_algorithm=NONE \
