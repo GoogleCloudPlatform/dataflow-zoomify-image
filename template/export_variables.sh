@@ -15,12 +15,15 @@
 
 PROJECT=your-project
 REGION=us-central1
-BUCKET=your-bucket
+INPUT_BUCKET=your-bucket
 INPUT_FOLDER=your/input/folder
+OUTPUT_BUCKET=your-bucket
 OUTPUT_FOLDER=your/output/folder
 FILE_EXTENSIONS=jpg,png,tif
 NUM_WORKERS=10
+STAGING_BUCKET=your-bucket
 STAGING_FOLDER=staging
+TEMP_BUCKET=your-bucket
 TEMP_FOLDER=tmp
 GOOGLE_APPLICATION_CREDENTIALS=/your/key/path.json
 JOB_NAME=job-name
