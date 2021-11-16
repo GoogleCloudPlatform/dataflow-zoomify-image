@@ -15,6 +15,7 @@
 """A workflow for tiling images
 """
 
+import os
 import io
 import argparse
 import logging
@@ -67,8 +68,18 @@ class UploadGCS(DoFnWithGCSClient):
 class ProcessTiles(DoFnWithGCSClient):
     def process(self, el):
         im = el["image"]
-        output = el["output"]
-        file_name = el["name"]
+        save_to = el["save_to"]
+        # Remove existing tiles if they exist
+        bucket_name = save_to.replace("gs://", "").split("/")[0]
+        bucket = self.client.bucket(bucket_name)
+        target_key = save_to.replace(f"gs://{bucket_name}/","")
+        blob = bucket.blob(target_key)
+        try:
+            self.executor.submit(blob.delete)
+        except Exception as e:
+            print(e)
+
+        # Create new tiles
         tile_size = 256
         num_tiles = 0
         tier = math.ceil(max([math.log(shape/tile_size, 2) for shape in im.shape]))
@@ -89,17 +100,13 @@ class ProcessTiles(DoFnWithGCSClient):
                     "tier_number": tier_number,
                     "item": item,
                     "tile_group": next(tile_group),
-                    "output": output,
-                    "name": file_name
+                    "save_to": save_to
                 }
         # Save ImageProperties.xml
         img_width = im.shape[1]
         img_height = im.shape[0]
         data = f'<IMAGE_PROPERTIES WIDTH="{img_width}" HEIGHT="{img_height}" NUMTILES="{num_tiles}" NUMIMAGES="1" VERSION="1.8" TILESIZE="{tile_size}"/>'
-        path = f"{output}{file_name}/ImageProperties.xml"
-        bucket_name = path.replace("gs://", "").split("/")[0]
-        bucket = self.client.bucket(bucket_name)
-        target_key = path.replace(f"gs://{bucket_name}/","")
+        target_key = save_to.replace(f"gs://{bucket_name}/","") + "/ImageProperties.xml"
         blob = bucket.blob(target_key)
         try:
             self.executor.submit(blob.upload_from_string, data)
@@ -109,17 +116,22 @@ class ProcessTiles(DoFnWithGCSClient):
 
 def by_extension(el, extensions):
   ext = el.path.split('.')[-1]
-  return ext in extensions
+  return ext.lower() in extensions
 
-def img_read(path, output):
+def img_read(path, output, input_dir):
     kwargs = {}
-    ext = path.split('.')[-1]
-    if ext == 'png':
+    directory, filename = os.path.split(path)
+    name, ext = os.path.splitext(filename)
+    subpath = directory[len(input_dir):]
+    if subpath:
+       # remove leading "/" before joining with output
+       subpath = subpath[1:] 
+    save_to = output + subpath + "/" + name
+    if ext.lower() == '.png':
         kwargs['pilmode'] = 'RGB' # discard alpha channel
     gcs = gcsio.GcsIO()
     return {"image": imageio.imread(gcs.open(path), **kwargs),
-            "name": path.split("/")[-1],
-            "output": output
+            "save_to": save_to
            }
 
 def save_tile(el):
@@ -128,8 +140,8 @@ def save_tile(el):
     tier_number = el["tier_number"]
     item = el["item"]
     tile_group = el["tile_group"]
-    output = el["output"] + el["name"]
-    path = f"{output}/TileGroup{tile_group}/{tier_number}-{item[1]}-{item[0]}.jpg"
+    save_to = el["save_to"]
+    path = f"{save_to}/TileGroup{tile_group}/{tier_number}-{item[1]}-{item[0]}.jpg"
 
     f = io.BytesIO()
     # gcs.open(path, 'w', mime_type="image/jpeg")
@@ -169,13 +181,15 @@ def main(argv=None, save_main_session=True):
 
   valid_extensions = known_args.extensions.split(',')
 
+  input_dir, file_pattern = os.path.split(known_args.input)
+
   with beam.Pipeline(options=pipeline_options) as p:
     # Read the text file[pattern] into a PCollection.
     files = p | MatchFiles(known_args.input)
     (
         files
         | 'Filter by file extension' >> beam.Filter(by_extension, valid_extensions)
-        | 'Read images to arrays' >> beam.Map(lambda x: img_read(x.path, known_args.output))
+        | 'Read images to arrays' >> beam.Map(lambda x: img_read(x.path, known_args.output, input_dir))
         | 'Tile images' >> beam.ParDo(ProcessTiles())
         | 'Save tile' >> beam.ParDo(save_tile)
         | 'Upload to GCS' >> beam.ParDo(UploadGCS())
