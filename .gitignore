@@ -137,4 +137,15 @@ dmypy.json
 
 # Cython debug symbols
 cython_debug/
+
+# Dev
 _export_variables.sh
+_run_local.sh
+_run_batch.sh
+/template/zoomify
+process_image.py
+zoomify_test.html
+credentials.json
+
+# Mac
+.DS_Store

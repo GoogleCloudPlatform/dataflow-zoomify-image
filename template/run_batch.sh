@@ -17,8 +17,8 @@ source venv/bin/activate
 
 source export_variables.sh
 
-python batch-tile-images.py --input gs://$INPUT_BUCKET/$INPUT_FOLDER/**.jpg \
- --output gs://$OUTPUT_BUCKET/$OUTPUT_FOLDER/ \
+python batch_tile_images.py --input gs://$INPUT_BUCKET/$INPUT_FOLDER/ \
+ --output gs://$OUTPUT_BUCKET/$OUTPUT_FOLDER \
  --extensions=$FILE_EXTENSIONS \
  --requirements_file requirements.txt \
  --runner=DataflowRunner \

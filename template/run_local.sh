@@ -13,11 +13,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-
-sudo apt update -y && sudo apt upgrade -y
-sudo apt install -y python3-venv
-python3 -m venv venv
 source venv/bin/activate
-pip install -U pip
-pip install apache-beam[gcp] Pillow
-pip install -r requirements.txt
+
+source export_variables.sh
+
+python batch_tile_images.py --input gs://$INPUT_BUCKET/$INPUT_FOLDER/ \
+ --output gs://$OUTPUT_BUCKET/$OUTPUT_FOLDER \
+ --extensions=$FILE_EXTENSIONS \
+ --requirements_file requirements.txt \
+ --runner=DirectRunner
