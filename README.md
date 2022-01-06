@@ -14,7 +14,7 @@ This repository contains a Dataflow template that can be used to tile images fro
 
 ## How it works
 
-1. First, original images must be placed in the INPUT_FOLDER (optional) of your INPUT_BUCKET.
+1. First, original images must be placed in the INPUT_FOLDER of your INPUT_BUCKET.
 2. The script will scan all images there with the specified FILE_EXTENSIONS.
 3. For each image, the script will extract its image code (file name without the extension) and check if it already exists in the BigQuery table.
 4. If it exists and if the file MD5 matches the corresponding MD5 from the record, then we are dealing with an image that was already processed and is unchanged, so the original image is simply discarded and erased from the bucket.
