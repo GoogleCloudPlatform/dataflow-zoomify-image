@@ -19,9 +19,9 @@ source export_variables.sh
 
 python batch_tile_images.py --input gs://$INPUT_BUCKET$INPUT_FOLDER/** \
  --output gs://$OUTPUT_BUCKET$OUTPUT_FOLDER/ \
- --project=$BIGQUERY_PROJECT \
- --dataset=$BIGQUERY_DATASET \
- --table=$BIGQUERY_TABLE \
+ --bigquery-project=$BIGQUERY_PROJECT \
+ --bigquery-dataset=$BIGQUERY_DATASET \
+ --bigquery-table=$BIGQUERY_TABLE \
  --final-bucket=$FINAL_BUCKET \
  --extensions=$FILE_EXTENSIONS \
  --requirements_file requirements.txt \

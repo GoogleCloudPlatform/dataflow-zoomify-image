@@ -348,16 +348,16 @@ def main(argv=None, save_main_session=True):
         help="File extensions to be processed.",
     )
     parser.add_argument(
-        '--project',
-        dest='project',
+        '--bigquery-project',
+        dest='bigquery_project',
         help='Bigquery project name.')
     parser.add_argument(
-        '--dataset',
-        dest='dataset',
+        '--bigquery-dataset',
+        dest='bigquery_dataset',
         help='Bigquery dataset name.')
     parser.add_argument(
-        '--table',
-        dest='table',
+        '--bigquery-table',
+        dest='bigquery_table',
         help='Bigquery table name.')
     parser.add_argument(
         '--final-bucket',
@@ -378,10 +378,10 @@ def main(argv=None, save_main_session=True):
         images = (
             files
             | "Filter by file extension" >> beam.Filter(by_extension, valid_extensions)
-            | 'Filter by file status' >> beam.ParDo(FilterByStatus(known_args.output, input_dir, known_args.project, known_args.dataset, known_args.table, known_args.final_bucket))
+            | 'Filter by file status' >> beam.ParDo(FilterByStatus(known_args.output, input_dir, known_args.bigquery_project, known_args.bigquery_dataset, known_args.bigquery_table, known_args.final_bucket))
             | "Read images to memory"
             >> beam.Map(lambda x: img_read(x)))
-        tiles = images | "Tile images" >> beam.ParDo(GenerateTiles(known_args.project, known_args.dataset, known_args.table, known_args.final_bucket))
+        tiles = images | "Tile images" >> beam.ParDo(GenerateTiles(known_args.bigquery_project, known_args.bigquery_dataset, known_args.bigquery_table, known_args.final_bucket))
         _ = tiles | "Upload to GCS" >> beam.ParDo(UploadImageToGCS())
 
 
