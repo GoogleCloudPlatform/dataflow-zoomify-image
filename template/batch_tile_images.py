@@ -97,7 +97,9 @@ class FilterByStatus(DoFnWithGCSClient):
         self.table = table
         self.final_bucket = final_bucket
     def setup(self):
-        super().setup()
+        # TODO(BEAM-6158): Revert the workaround once we can pickle super() on py3.
+        #super().setup()
+        DoFnWithGCSClient.setup(self)
         self.bgclient = bigquery.Client(project=self.project)
     def process(self, el):
         # Get image names
@@ -223,7 +225,9 @@ class GenerateTiles(DoFnWithGCSClient):
 
     def setup(self):
         """Starts GCS client and BigQuery client."""
-        super().setup()
+        # TODO(BEAM-6158): Revert the workaround once we can pickle super() on py3.
+        #super().setup()
+        DoFnWithGCSClient.setup(self)
         self.bgclient = bigquery.Client(project=self.project)
 
     def process(self, el):
