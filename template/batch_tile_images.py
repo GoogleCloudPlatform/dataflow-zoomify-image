@@ -281,10 +281,11 @@ class GenerateTiles(DoFnWithGCSClient):
             md5 = el["md5"]
             dataset = self.dataset
             table = self.table
+            path_in_db,tail = os.path.split(output_folder)
             if el["action"] == "insert":
-                cmd = f'insert into `{dataset}.{table}` (barcode, imagecode, filename, path, width, height, md5) values("{barcode}", "{imagecode}", "{filename}", "{output_folder}", {img_width}, {img_height}, "{md5}")'
+                cmd = f'insert into `{dataset}.{table}` (barcode, imagecode, filename, path, width, height, md5) values("{barcode}", "{imagecode}", "{filename}", "{path_in_db}", {img_width}, {img_height}, "{md5}")'
             else:
-                cmd = f'update `{dataset}.{table}` set filename="{filename}", path="{output_folder}", width={img_width}, height={img_height}, md5="{md5}" where imagecode="{imagecode}"'
+                cmd = f'update `{dataset}.{table}` set filename="{filename}", path="{path_in_db}", width={img_width}, height={img_height}, md5="{md5}" where imagecode="{imagecode}"'
             query_job = self.bgclient.query(cmd)
             result = query_job.result()
             # Move input image to final destination
