@@ -111,7 +111,7 @@ class FilterByStatus(DoFnWithGCSClient):
         if subpath:
            # remove leading "/" before joining with output
            subpath = subpath[1:]
-        save_to = self.output + subpath + "/" + name
+        save_to = os.path.join(self.output, subpath, name)
         # Get input image md5
         bucket_name, target_key = split_path(path)
         bucket = self.client.bucket(bucket_name)
@@ -167,7 +167,7 @@ class UploadImageToGCS(DoFnWithGCSClient):
         path = element.path
         image_buffer = BytesIO()
         element.image.save(image_buffer, format="jpeg")
-        bucket_name, target_key = split_path(tile_path)
+        bucket_name, target_key = split_path(path)
         bucket = self.client.bucket(bucket_name)
         blob = bucket.blob(target_key)
         try:
