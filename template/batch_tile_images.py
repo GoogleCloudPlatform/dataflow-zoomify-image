@@ -167,9 +167,8 @@ class UploadImageToGCS(DoFnWithGCSClient):
         path = element.path
         image_buffer = BytesIO()
         element.image.save(image_buffer, format="jpeg")
-        bucket_name = path.replace("gs://", "").split("/")[0]
+        bucket_name, target_key = split_path(tile_path)
         bucket = self.client.bucket(bucket_name)
-        target_key = path.replace(f"gs://{bucket_name}/", "")
         blob = bucket.blob(target_key)
         try:
             self.executor.submit(
