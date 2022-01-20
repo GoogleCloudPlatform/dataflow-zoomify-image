@@ -132,8 +132,7 @@ class FilterByStatus(DoFnWithGCSClient):
                 blob.delete()
                 return
             # delete old version of the image (which can be in another location!)
-            orig_name, orig_ext = os.path.splitext(row.filename)
-            orig_key = row.path + orig_ext
+            orig_key = row.path + os.path.sep + row.filename
             final_bucket = self.client.bucket(self.final_bucket)
             orig_blob = final_bucket.blob(orig_key)
             try:
