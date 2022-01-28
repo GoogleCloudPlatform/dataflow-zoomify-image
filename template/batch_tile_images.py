@@ -19,13 +19,14 @@ import math
 import os
 import argparse
 import logging
+import warnings
 
 from concurrent.futures import ThreadPoolExecutor
 from abc import ABC, abstractmethod
 from typing import Generator, List, NamedTuple
 from itertools import count
 
-from PIL import Image, ImageOps
+from PIL import Image, ImageOps, ImageFile
 
 import requests
 
@@ -39,6 +40,9 @@ from apache_beam.options.pipeline_options import SetupOptions
 from google.cloud import storage
 from google.cloud import bigquery
 from google.cloud.exceptions import GoogleCloudError
+
+warnings.simplefilter('ignore', Image.DecompressionBombWarning) # Ignore DecompressionBombWarning warnings
+ImageFile.LOAD_TRUNCATED_IMAGES = True # Avoid interrupting the flow with truncated images
 
 TILE_SIZE = 256
 
