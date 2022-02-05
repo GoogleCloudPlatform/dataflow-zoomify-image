@@ -236,14 +236,15 @@ class GenerateTiles(DoFnWithGCSClient):
         """Generate tiles."""
         im = el["image"]
         save_to = el["save_to"]
-        # Remove existing tiles if they exist
-        bucket_name, target_key = split_path(save_to)
-        bucket = self.client.bucket(bucket_name)
-        blob = bucket.blob(target_key)
-        try:
-            self.executor.submit(blob.delete)
-        except Exception as e:
-            print(e)
+        if el["action"] == "update":
+            # Remove existing tiles if they exist
+            bucket_name, target_key = split_path(save_to)
+            bucket = self.client.bucket(bucket_name)
+            blobs = list(bucket.list_blobs(prefix=target_key))
+            try:
+                bucket.delete_blobs(blobs)
+            except Exception as e:
+                print(e)
 
         # Generate tiers (downscaled images)
         images = []
