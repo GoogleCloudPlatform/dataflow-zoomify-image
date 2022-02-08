@@ -59,7 +59,7 @@ class CloudImageManager():
             tiles_key = row.path + os.path.sep + imagecode
             print('Deleting tiles', tiles_key, 'in', self.tiles_bucket)
             blobs = list(self.tiles_bucket.list_blobs(prefix=tiles_key))
-            tiles_bucket.delete_blobs(blobs)
+            self.tiles_bucket.delete_blobs(blobs)
             
             # Delete BigQuery record
             print('Deleting', dataset + '.' + table, 'record with imagecode', imagecode)
