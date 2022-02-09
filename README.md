@@ -5,7 +5,7 @@ This repository contains a Dataflow template that can be used to tile images fro
 ## How to use this template
 
 1. Clone it from GitHub.
-2. Create a BigQuery project/dataset/table with the following fields: barcode (str), imagecode (str), filename (str), path (str), width (int), height (int), md5 (str).
+2. Create a BigQuery project/dataset/table with the following fields: barcode (str), imagecode (str), extension (str), path (str), width (int), height (int), md5 (str), modified (timestamp).
 3. Edit the `export_variables.sh` file inside the `template` folder with your variables, creating the buckets if necessary.
 4. The service account used in GOOGLE_APPLICATION_CREDENTIALS needs the right permissions (Dataflow, Cloud Storage and BigQuery).
 5. Upload sample images to your INPUT_BUCKET.

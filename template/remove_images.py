@@ -42,12 +42,12 @@ class CloudImageManager():
     def delete_image(self, imagecode):
         dataset = self.dataset
         table = self.table
-        cmd = f"select filename, path, md5 from `{dataset}.{table}` where imagecode='{imagecode}' limit 1"
+        cmd = f"select path, extension from `{dataset}.{table}` where imagecode='{imagecode}' limit 1"
         query_job = self.bgclient.query(cmd)
         rows = query_job.result()
         for row in rows:
             # Delete image
-            image_key = row.path + os.path.sep + row.filename
+            image_key = row.path + os.path.sep + imagecode + '.' + row.extension
             print('Deleting image', image_key, 'in', self.images_bucket)
             blob = self.images_bucket.blob(image_key)
             try:

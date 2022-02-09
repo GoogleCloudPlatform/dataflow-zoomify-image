@@ -20,6 +20,7 @@ import os
 import argparse
 import logging
 import warnings
+from datetime import datetime
 
 from concurrent.futures import ThreadPoolExecutor
 from abc import ABC, abstractmethod
@@ -86,20 +87,21 @@ class FilterByStatus(DoFnWithGCSClient):
 
     Elements are file objects from where we get the path.
     Instances are initiated with:
-    output: output bucket name
-    input_dir: directory where file resides in input bucket
+    output_path: GCS URI with output location (gs://bucket-name/dir/subdir)
+    input_path: GCS URI with input location (gs://bucket-name/dir/subdir)
     project: bigquery project name
     dataset: bigquery dataset name
     table: bigquery table name
     final_bucket: bucket name to move imported images
     """
-    def __init__(self, output: str, input_dir: str, project: str, dataset: str, table: str, final_bucket: str):
-        self.output = output
-        self.input_dir = input_dir
+    def __init__(self, output_path: str, input_path: str, project: str, dataset: str, table: str, final_bucket: str, initial_import:bool):
+        self.output_path = output_path
+        self.input_path = input_path
         self.project = project
         self.dataset = dataset
         self.table = table
         self.final_bucket = final_bucket
+        self.initial_import = initial_import
     def setup(self):
         # TODO(BEAM-6158): Revert the workaround once we can pickle super() on py3.
         #super().setup()
@@ -107,49 +109,51 @@ class FilterByStatus(DoFnWithGCSClient):
         self.bgclient = bigquery.Client(project=self.project)
     def process(self, el):
         # Get image names
-        path = el.path
-        directory, filename = os.path.split(path)
-        name, ext = os.path.splitext(filename)
+        img_input_path = el.path
+        directory, filename = os.path.split(img_input_path)
+        name, extension = os.path.splitext(filename)
         imagecode = name
-        subpath = directory[len(self.input_dir):]
-        if subpath:
+        img_subpath = directory[len(self.input_path):]
+        if img_subpath:
            # remove leading "/" before joining with output
-           subpath = subpath[1:]
-        save_to = os.path.join(self.output, subpath, name)
+           img_subpath = img_subpath[1:]
+        save_to = os.path.join(self.output_path, img_subpath, name)
         # Get input image md5
-        bucket_name, target_key = split_path(path)
-        bucket = self.client.bucket(bucket_name)
-        blob = bucket.get_blob(target_key)
+        input_bucket_name, target_key = split_path(img_input_path)
+        input_bucket = self.client.bucket(input_bucket_name)
+        blob = input_bucket.get_blob(target_key)
         input_md5 = blob.md5_hash
         dataset = self.dataset
         table = self.table
-        # Check if image was already imported
-        cmd = f"select filename, path, md5 from `{dataset}.{table}` where imagecode='{imagecode}' limit 1"
-        query_job = self.bgclient.query(cmd)
-        rows = query_job.result()
         action = 'insert'
-        for row in rows:
-            action = 'update'
-            # Compare with recorded md5
-            if row.md5 == input_md5:
-                # ignore unchanged images, removing them
-                blob.delete()
-                return
-            # delete old version of the image (which can be in another location!)
-            orig_key = row.path + os.path.sep + row.filename
-            final_bucket = self.client.bucket(self.final_bucket)
-            orig_blob = final_bucket.blob(orig_key)
-            try:
-                orig_blob.delete()
-            except Exception as e:
-                print(e)
-            break
+        if not self.initial_import:
+            # Check if image was already imported
+            cmd = f"select CONCAT(imagecode, '.', extension) as filename, path, md5 from `{dataset}.{table}` where imagecode='{imagecode}' limit 1"
+            query_job = self.bgclient.query(cmd)
+            rows = query_job.result()
+            for row in rows:
+                action = 'update'
+                # Compare with recorded md5
+                if row.md5 == input_md5:
+                    # ignore unchanged images, removing them if they are in a different bucket
+                    if input_bucket_name != self.final_bucket:
+                        blob.delete()
+                    return
+                # delete old version of the image (which can be in another location!)
+                if input_bucket_name != self.final_bucket:
+                    orig_key = row.path + os.path.sep + row.filename
+                    final_bucket = self.client.bucket(self.final_bucket)
+                    orig_blob = final_bucket.blob(orig_key)
+                    try:
+                        orig_blob.delete()
+                    except Exception as e:
+                        print(e)
+                break
         # Only process new or changed images
         yield{
-            "input_path": path, 
+            "img_input_path": img_input_path, 
             "save_to": save_to,
-            "filename": filename,
-            "ext": ext,
+            "extension": extension.split('.')[-1],
             "imagecode": imagecode,
             "barcode": imagecode.split("_")[0],
             "md5": input_md5, 
@@ -236,10 +240,10 @@ class GenerateTiles(DoFnWithGCSClient):
         """Generate tiles."""
         im = el["image"]
         save_to = el["save_to"]
+        bucket_name, target_key = split_path(save_to)
+        bucket = self.client.bucket(bucket_name)
         if el["action"] == "update":
             # Remove existing tiles if they exist
-            bucket_name, target_key = split_path(save_to)
-            bucket = self.client.bucket(bucket_name)
             blobs = list(bucket.list_blobs(prefix=target_key))
             try:
                 bucket.delete_blobs(blobs)
@@ -281,27 +285,29 @@ class GenerateTiles(DoFnWithGCSClient):
             # Save image metadata in db
             barcode = el["barcode"]
             imagecode = el["imagecode"]
-            filename = el["filename"]
+            extension = el["extension"]
             md5 = el["md5"]
             dataset = self.dataset
             table = self.table
             path_in_db,tail = os.path.split(output_folder)
+            modified = datetime.now()
             if el["action"] == "insert":
-                cmd = f'insert into `{dataset}.{table}` (barcode, imagecode, filename, path, width, height, md5) values("{barcode}", "{imagecode}", "{filename}", "{path_in_db}", {img_width}, {img_height}, "{md5}")'
+                cmd = f'insert into `{dataset}.{table}` (barcode, imagecode, extension, path, width, height, md5, modified) values("{barcode}", "{imagecode}", "{extension}", "{path_in_db}", {img_width}, {img_height}, "{md5}", "{modified}")'
             else:
-                cmd = f'update `{dataset}.{table}` set filename="{filename}", path="{path_in_db}", width={img_width}, height={img_height}, md5="{md5}" where imagecode="{imagecode}"'
+                cmd = f'update `{dataset}.{table}` set extension="{extension}", path="{path_in_db}", width={img_width}, height={img_height}, md5="{md5}", modified="{modified}" where imagecode="{imagecode}"'
             query_job = self.bgclient.query(cmd)
             result = query_job.result()
-            # Move input image to final destination
-            input_bucket_name, target_key = split_path(el["input_path"])
-            input_bucket = self.client.bucket(input_bucket_name)
-            input_blob = input_bucket.blob(target_key)
-            final_bucket = self.client.bucket(self.final_bucket)
-            blob_copy = input_bucket.copy_blob(input_blob, final_bucket, target_key)
-            try:
-                self.executor.submit(input_blob.delete)
-            except Exception as e:
-                print(e)
+            input_bucket_name, target_key = split_path(el["img_input_path"])
+            if input_bucket_name != self.final_bucket:
+                # Move input image to final destination
+                input_bucket = self.client.bucket(input_bucket_name)
+                input_blob = input_bucket.blob(target_key)
+                final_bucket = self.client.bucket(self.final_bucket)
+                blob_copy = input_bucket.copy_blob(input_blob, final_bucket, target_key)
+                try:
+                    self.executor.submit(input_blob.delete)
+                except Exception as e:
+                    print(e)
 
 
 def split_path(path):
@@ -317,16 +323,16 @@ def by_extension(element: FileMetadata, extensions: List[str]) -> bool:
 
 def img_read(el):
     """Reads image from a path in GCS and return the other parameters received."""
-    path = el["input_path"]
+    img_input_path = el["img_input_path"]
     gcs = gcsio.GcsIO()
-    image = Image.open(gcs.open(path)).convert("RGB")
+    image = Image.open(gcs.open(img_input_path)).convert("RGB")
     image = ImageOps.exif_transpose(image)
 
     return {"image": image,
             "save_to": el["save_to"],
             "md5": el["md5"],
-            "input_path": path,
-            "filename": el["filename"],
+            "img_input_path": img_input_path,
+            "extension": el["extension"],
             "imagecode": el["imagecode"],
             "barcode": el["barcode"],
             "action": el["action"]
@@ -371,6 +377,13 @@ def main(argv=None, save_main_session=True):
         '--final-bucket',
         dest='final_bucket',
         help='Final bucket destination for input images.')
+    parser.add_argument(
+        '--initial-import',
+        dest='initial_import',
+        action='store_true',
+        default=False,
+        help='Avoid BigQuery check if image already exists, importing everything.')
+
     known_args, pipeline_args = parser.parse_known_args(argv)
 
     pipeline_options = PipelineOptions(pipeline_args)
@@ -378,7 +391,7 @@ def main(argv=None, save_main_session=True):
 
     valid_extensions = known_args.extensions.split(",")
 
-    input_dir, _ = os.path.split(known_args.input)
+    input_path, _ = os.path.split(known_args.input)
 
     with beam.Pipeline(options=pipeline_options) as pipeline:
         # Read the text file[pattern] into a PCollection.
@@ -386,7 +399,7 @@ def main(argv=None, save_main_session=True):
         images = (
             files
             | "Filter by file extension" >> beam.Filter(by_extension, valid_extensions)
-            | 'Filter by file status' >> beam.ParDo(FilterByStatus(known_args.output, input_dir, known_args.bigquery_project, known_args.bigquery_dataset, known_args.bigquery_table, known_args.final_bucket))
+            | 'Filter by file status' >> beam.ParDo(FilterByStatus(known_args.output, input_path, known_args.bigquery_project, known_args.bigquery_dataset, known_args.bigquery_table, known_args.final_bucket, known_args.initial_import))
             | "Read images to memory"
             >> beam.Map(lambda x: img_read(x)))
         tiles = images | "Tile images" >> beam.ParDo(GenerateTiles(known_args.bigquery_project, known_args.bigquery_dataset, known_args.bigquery_table, known_args.final_bucket))
