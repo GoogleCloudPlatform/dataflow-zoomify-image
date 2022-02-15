@@ -401,8 +401,8 @@ def main(argv=None, save_main_session=True):
             | "Filter by file extension" >> beam.Filter(by_extension, valid_extensions)
             | 'Filter by file status' >> beam.ParDo(FilterByStatus(known_args.output, input_path, known_args.bigquery_project, known_args.bigquery_dataset, known_args.bigquery_table, known_args.final_bucket, known_args.initial_import))
             | "Read images to memory"
-            >> beam.Map(lambda x: img_read(x)))
-        tiles = images | "Tile images" >> beam.ParDo(GenerateTiles(known_args.bigquery_project, known_args.bigquery_dataset, known_args.bigquery_table, known_args.final_bucket))
+            >> beam.Map(lambda x: img_read(x)) | 'Reshuffle1' >> beam.Reshuffle())
+        tiles = images | "Tile images" >> beam.ParDo(GenerateTiles(known_args.bigquery_project, known_args.bigquery_dataset, known_args.bigquery_table, known_args.final_bucket)) | 'Reshuffle2' >> beam.Reshuffle()
         _ = tiles | "Upload to GCS" >> beam.ParDo(UploadImageToGCS())
 
 
