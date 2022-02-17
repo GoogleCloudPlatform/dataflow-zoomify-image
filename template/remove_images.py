@@ -39,37 +39,44 @@ class CloudImageManager():
         self.images_bucket = self.client.bucket(images_bucket)
         self.tiles_bucket = self.client.bucket(tiles_bucket)
 
-    def delete_image(self, imagecode):
+    def delete_images(self, imagecodes):
+        imagecodes = [str(v) for v in imagecodes]
+        sep_imagecodes = "','".join(imagecodes)
+        deleted_images = []
         dataset = self.dataset
         table = self.table
-        cmd = f"select path, extension from `{dataset}.{table}` where imagecode='{imagecode}' limit 1"
+        cmd = f"select path, imagecode, extension from `{dataset}.{table}` where imagecode in ('{sep_imagecodes}')"
         query_job = self.bgclient.query(cmd)
         rows = query_job.result()
         for row in rows:
-            # Delete image
-            image_key = row.path + os.path.sep + imagecode + '.' + row.extension
-            print('Deleting image', image_key, 'in', self.images_bucket)
-            blob = self.images_bucket.blob(image_key)
-            try:
-                blob.delete()
-            except Exception as e:
-                print(e)
+            self.delete_image(row.path, row.imagecode, row.extension)
+            deleted_images.append(row.imagecode)
+        for imagecode in imagecodes:
+            if imagecode not in deleted_images:
+                print('Image code', imagecode, 'not found!')
 
-            # Delete tiles
-            tiles_key = row.path + os.path.sep + imagecode
-            print('Deleting tiles', tiles_key, 'in', self.tiles_bucket)
-            blobs = list(self.tiles_bucket.list_blobs(prefix=tiles_key))
-            self.tiles_bucket.delete_blobs(blobs)
+    def delete_image(self, path, imagecode, extension):
+        # Delete image
+        image_key = path + os.path.sep + imagecode + '.' + extension
+        print('Deleting image', image_key, 'in', self.images_bucket)
+        blob = self.images_bucket.blob(image_key)
+        try:
+            blob.delete()
+        except Exception as e:
+            print(e)
+
+        # Delete tiles
+        tiles_key = path + os.path.sep + imagecode
+        print('Deleting tiles', tiles_key, 'in', self.tiles_bucket)
+        blobs = list(self.tiles_bucket.list_blobs(prefix=tiles_key))
+        self.tiles_bucket.delete_blobs(blobs)
             
-            # Delete BigQuery record
-            print('Deleting', dataset + '.' + table, 'record with imagecode', imagecode)
-            cmd = f'delete from `{dataset}.{table}` where imagecode="{imagecode}"'
-            query_job = self.bgclient.query(cmd)
-            result = query_job.result()
-            
-            return
-        print('Image', imagecode, 'not found')
-    
+        # Delete BigQuery record
+        print('Deleting', dataset + '.' + table, 'record with imagecode', imagecode)
+        cmd = f'delete from `{dataset}.{table}` where imagecode="{imagecode}"'
+        query_job = self.bgclient.query(cmd)
+        result = query_job.result()
+
 def main(argv=None):
     """Main entry point"""
 
@@ -103,9 +110,9 @@ def main(argv=None):
 
     manager = CloudImageManager(known_args.images_bucket, known_args.tiles_bucket, known_args.bigquery_project, known_args.bigquery_dataset, known_args.bigquery_table)
     
-    images = known_args.images.split(',')
-    for imagecode in images:
-        manager.delete_image(imagecode)
+    imagecodes = known_args.images.split(',')
+
+    manager.delete_images(imagecodes)
 
 if __name__ == "__main__":
     logging.getLogger().setLevel(logging.INFO)
