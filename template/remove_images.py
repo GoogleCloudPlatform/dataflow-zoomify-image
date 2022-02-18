@@ -72,6 +72,8 @@ class CloudImageManager():
         self.tiles_bucket.delete_blobs(blobs)
             
         # Delete BigQuery record
+        dataset = self.dataset
+        table = self.table
         print('Deleting', dataset + '.' + table, 'record with imagecode', imagecode)
         cmd = f'delete from `{dataset}.{table}` where imagecode="{imagecode}"'
         query_job = self.bgclient.query(cmd)
