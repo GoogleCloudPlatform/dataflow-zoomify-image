@@ -175,15 +175,16 @@ class GenerateTiles(beam.DoFn):
 
         # Generate tiers (downscaled images)
         images = []
-        tier = math.ceil(
-            max([math.log(shape / TILE_SIZE, 2) for shape in element["parameters"]["image"].size])
-            )
+        tier = math.ceil(max([math.log(
+            shape / TILE_SIZE,
+            2) for shape in element["parameters"]["image"].size]))
         for i in range(tier, 0, -1):
             size = (
                 element["parameters"]["image"].size[0] // 2 ** i,
                 element["parameters"]["image"].size[1] // 2 ** i
                 )
-            images.append(element["parameters"]["image"].resize(size, Image.BOX))
+            images.append(
+                element["parameters"]["image"].resize(size, Image.BOX))
         images.append(element["parameters"]["image"])
 
         # Tile generator
@@ -198,8 +199,10 @@ class GenerateTiles(beam.DoFn):
                 yield beam.pvalue.TaggedOutput("tiles", tile)
 
         # Save ImageProperties.xml
-        element["parameters"]["img_width"] = element["parameters"]["image"].size[0]
-        element["parameters"]["img_height"] = element["parameters"]["image"].size[1]
+        element["parameters"]["img_width"] = (
+            element["parameters"]["image"].size[0])
+        element["parameters"]["img_height"] = (
+            element["parameters"]["image"].size[1])
         del element["parameters"]["image"]
 
         data = (
@@ -209,7 +212,8 @@ class GenerateTiles(beam.DoFn):
             'NUMIMAGES="1" VERSION="1.8" '
             f'TILESIZE="{TILE_SIZE}"/>'
         )
-        output_folder = element["parameters"]["save_to"].replace(f"gs://{bucket_name}/","")
+        output_folder = element["parameters"]["save_to"].replace(
+            f"gs://{bucket_name}/","")
         target_key = output_folder + "/ImageProperties.xml"
         blob = bucket.blob(target_key)
 
@@ -355,7 +359,7 @@ def update_table(_, bq_table, bq_update_table):
         query_job.result()
     except GoogleCloudError as error:
         print(error)
-    
+
     return "Ok"
 
 def create_bq_dict(parameters):
@@ -426,7 +430,8 @@ def main(argv=None, save_main_session=True):
     known_args, pipeline_args = parser.parse_known_args(argv)
 
     pipeline_options = PipelineOptions(pipeline_args)
-    pipeline_options.view_as(SetupOptions).save_main_session = save_main_session
+    pipeline_options.view_as(
+        SetupOptions).save_main_session = save_main_session
 
     valid_extensions = known_args.extensions.split(",")
 
@@ -467,7 +472,7 @@ def main(argv=None, save_main_session=True):
 
         # Read existing metadata from Bigquery
         bq_metadata = (
-            pipeline 
+            pipeline
             | beam.Create([])
             ) if known_args.initial_import else (
             pipeline
@@ -544,7 +549,8 @@ def main(argv=None, save_main_session=True):
                 ),
                 dataset=known_args.bigquery_dataset,
                 project=known_args.bigquery_project,
-                schema=bq_beam.TableSchema(fields=bigquery_table_schema["fields"])
+                schema=bq_beam.TableSchema(
+                    fields=bigquery_table_schema["fields"])
                 )
         )
 
