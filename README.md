@@ -37,6 +37,11 @@ and is moved to:
 
 Image viewers, like OpenSeaDragon, can then be configured to display the zoomified image, loading different sets of tiles at different zoom levels.
 
+
+Dataflow pipeline graph view:
+
+![Dataflow Pipeline](docs/images/dataflow-pipeline.png?raw=true "Dataflow Pipeline")
+
 ##
 
 
