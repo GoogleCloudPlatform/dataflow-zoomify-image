@@ -15,10 +15,14 @@
 
 PROJECT=your-project
 REGION=us-central1
-INPUT_BUCKET=your-bucket
+INPUT_BUCKET=bucket-where-original-images-must-be-uploaded
 INPUT_FOLDER=your/input/folder
-OUTPUT_BUCKET=your-bucket
+OUTPUT_BUCKET=bucket-where-tiles-are-generated
 OUTPUT_FOLDER=your/output/folder
+BIGQUERY_PROJECT=bigquery-project-name
+BIGQUERY_DATASET=bigquery-dataset-name
+BIGQUERY_TABLE=bigquery-table-name
+FINAL_BUCKET=bucket-where-original-images-are-moved-to
 FILE_EXTENSIONS=jpg,png,tif
 NUM_WORKERS=10
 STAGING_BUCKET=your-bucket

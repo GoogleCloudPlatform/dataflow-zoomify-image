@@ -17,8 +17,12 @@ source venv/bin/activate
 
 source export_variables.sh
 
-python batch_tile_images.py --input gs://$INPUT_BUCKET/$INPUT_FOLDER/ \
- --output gs://$OUTPUT_BUCKET/$OUTPUT_FOLDER \
+python batch_tile_images.py --input gs://$INPUT_BUCKET$INPUT_FOLDER/** \
+ --output gs://$OUTPUT_BUCKET$OUTPUT_FOLDER/ \
+ --bigquery-project=$PROJECT \
+ --bigquery-dataset=$BIGQUERY_DATASET \
+ --bigquery-table=$BIGQUERY_TABLE \
+ --final-bucket=$FINAL_BUCKET \
  --extensions=$FILE_EXTENSIONS \
  --requirements_file requirements.txt \
  --runner=DirectRunner

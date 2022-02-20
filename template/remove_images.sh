@@ -17,19 +17,10 @@ source venv/bin/activate
 
 source export_variables.sh
 
-python batch_tile_images.py --input gs://$INPUT_BUCKET$INPUT_FOLDER/** \
- --output gs://$OUTPUT_BUCKET$OUTPUT_FOLDER/ \
+python remove_images.py \
+ --images-bucket=$FINAL_BUCKET \
+ --tiles-bucket=$OUTPUT_BUCKET \
  --bigquery-project=$BIGQUERY_PROJECT \
  --bigquery-dataset=$BIGQUERY_DATASET \
  --bigquery-table=$BIGQUERY_TABLE \
- --final-bucket=$FINAL_BUCKET \
- --extensions=$FILE_EXTENSIONS \
- --requirements_file requirements.txt \
- --runner=DataflowRunner \
- --autoscaling_algorithm=NONE \
- --num_workers=$NUM_WORKERS \
- --project=$PROJECT \
- --region=$REGION \
- --staging_location=gs://$STAGING_BUCKET/$STAGING_FOLDER \
- --temp_location=gs://$TEMP_BUCKET/$TEMP_FOLDER \
- --job_name=$JOB_NAME
+ --images="$@"
