@@ -287,7 +287,7 @@ class ReadImage(beam.DoFn):
             "save_to": save_to,
             "md5": blob.md5_hash,
             "img_input_path": img_input_path,
-            "extension": extension,
+            "extension": extension.split('.')[-1], # remove leading dot from extension
             "imagecode": name,
             "barcode": name.split("_")[0],
             "action": "update" if element["bq_metadata"] else "insert"
