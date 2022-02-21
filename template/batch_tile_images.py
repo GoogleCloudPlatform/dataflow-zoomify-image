@@ -423,9 +423,8 @@ def main(argv=None, save_main_session=True):
     parser.add_argument(
         '--bq-temp-suffix',
         dest='bq_temp_suffix',
-        action='store_true',
         default="temp",
-        help='Avoid checking BigQuery whether image already exists.')
+        help='Suffix for temporary BigQuery table.')
 
     known_args, pipeline_args = parser.parse_known_args(argv)
 
