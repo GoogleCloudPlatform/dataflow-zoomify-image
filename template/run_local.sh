@@ -25,4 +25,7 @@ python batch_tile_images.py --input gs://$INPUT_BUCKET$INPUT_FOLDER/** \
  --final-bucket=$FINAL_BUCKET \
  --extensions=$FILE_EXTENSIONS \
  --requirements_file requirements.txt \
- --runner=DirectRunner
+ --project=$PROJECT \
+ --region=$REGION \
+ --temp_location=gs://$TEMP_BUCKET/$TEMP_FOLDER \
+ --runner=DirectRunner 

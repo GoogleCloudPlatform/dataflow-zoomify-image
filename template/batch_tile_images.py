@@ -100,7 +100,7 @@ class UploadImageToGCS(DoFnWithGCSClientMultithread):
         """Uploads image to GCS."""
         path = element.path
         image_buffer = BytesIO()
-        element.image.save(image_buffer, format="jpeg")
+        element.image.save(image_buffer, format="jpeg", quality=80)
         bucket_name, target_key = split_path(path)
         bucket = self.client.bucket(bucket_name)
         blob = bucket.blob(target_key)
@@ -281,7 +281,7 @@ class ReadImage(beam.DoFn):
             "save_to": save_to,
             "md5": blob.md5_hash,
             "img_input_path": img_input_path,
-            "extension": extension,
+            "extension": extension.split('.')[-1], # remove leading dot from extension
             "imagecode": name,
             "barcode": name.split("_")[0],
             "action": "update" if element["bq_metadata"] else "insert"
@@ -418,7 +418,7 @@ def main(argv=None, save_main_session=True):
         '--bq-temp-suffix',
         dest='bq_temp_suffix',
         default="temp",
-        help='Avoid checking BigQuery whether image already exists.')
+        help='Suffix for temporary BigQuery table.')
 
     known_args, pipeline_args = parser.parse_known_args(argv)
 
