@@ -15,7 +15,6 @@
 """A workflow for tiling images
 """
 from io import BytesIO
-import math
 import os
 import argparse
 import logging
@@ -174,18 +173,13 @@ class GenerateTiles(beam.DoFn):
                 print(error)
 
         # Generate tiers (downscaled images)
-        images = []
-        tier = math.ceil(max([math.log(
-            shape / TILE_SIZE,
-            2) for shape in element["parameters"]["image"].size]))
-        for i in range(tier, 0, -1):
-            size = (
-                element["parameters"]["image"].size[0] // 2 ** i,
-                element["parameters"]["image"].size[1] // 2 ** i
-                )
-            images.append(
-                element["parameters"]["image"].resize(size, Image.BOX))
-        images.append(element["parameters"]["image"])
+        images = [element["parameters"]["image"]]
+        width, height = element["parameters"]["image"].size
+
+        while height > TILE_SIZE or width > TILE_SIZE:
+            width //= 2
+            height //= 2
+            images.insert(0, images[-1].resize((width, height), Image.BOX))
 
         # Tile generator
         i_gen = count()
@@ -423,7 +417,6 @@ def main(argv=None, save_main_session=True):
     parser.add_argument(
         '--bq-temp-suffix',
         dest='bq_temp_suffix',
-        action='store_true',
         default="temp",
         help='Avoid checking BigQuery whether image already exists.')
 
