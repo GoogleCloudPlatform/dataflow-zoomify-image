@@ -1,6 +1,6 @@
 # Image Zoomifier
 
-This repository contains a Dataflow template that can be used to tile images from Google Cloud Storage according to the Zoomify specification.
+This repository contains a Google Cloud Dataflow template that can be used to tile images from Google Cloud Storage according to the Zoomify specification.
 
 ## How to use this template
 
@@ -37,10 +37,34 @@ and is moved to:
 
 Image viewers, like OpenSeaDragon, can then be configured to display the zoomified image, loading different sets of tiles at different zoom levels.
 
-
-Dataflow pipeline graph view:
+## Dataflow pipeline graph
 
 ![Dataflow Pipeline](docs/images/dataflow-pipeline.png?raw=true "Dataflow Pipeline")
+
+## About the BigQuery data structure
+
+This model was created for a context where images depict physical collection objects having a unique identifier that can be visually present as a barcode. Each collection is usually associated with a unique acronym used as a prefix in all of its objects identifiers, avoiding conflicts between images from different collections. Since multiple images can be taken for the same collection object, in some cases the barcode does not serve as an image identifier. In this case, an additional suffix is used to distinguish between images of the same collection object. Therefore, this is the pattern used for image file names:
+
+    COLLECTIONID-OBJECTID[_PICTUREID].extension
+
+Examples:
+
+A collection object with a single picture:
+
+    ABC00037.png
+    (imagecode = barcode = ABC00037)
+
+An object with the same internal id, but from another collection:
+
+    EFG00037.png
+    (imagecode = barcode = EFG00037)
+
+A collection object with multiplle images:
+
+    ABC00037_1.png
+    (imagecode = ABC00037_1; barcode = ABC00037)
+    ABC00037_2.png
+    (imagecode = ABC00037_2; barcode = ABC00037)
 
 ##
 
