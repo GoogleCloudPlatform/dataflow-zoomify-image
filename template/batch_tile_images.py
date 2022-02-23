@@ -101,7 +101,7 @@ class UploadImageToGCS(DoFnWithGCSClientMultithread):
         """Uploads image to GCS."""
         path = element.path
         image_buffer = BytesIO()
-        element.image.save(image_buffer, format="jpeg")
+        element.image.save(image_buffer, format="jpeg", quality=80)
         bucket_name, target_key = split_path(path)
         bucket = self.client.bucket(bucket_name)
         blob = bucket.blob(target_key)
