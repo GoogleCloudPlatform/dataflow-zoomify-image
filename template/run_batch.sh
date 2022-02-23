@@ -17,8 +17,8 @@ source venv/bin/activate
 
 source export_variables.sh
 
-python batch_tile_images.py --input gs://$INPUT_BUCKET/$INPUT_FOLDER/** \
- --output gs://$OUTPUT_BUCKET/$OUTPUT_FOLDER/ \
+python batch_tile_images.py --input gs://$INPUT_BUCKET$INPUT_FOLDER/** \
+ --output gs://$OUTPUT_BUCKET$OUTPUT_FOLDER/ \
  --bigquery-project=$BIGQUERY_PROJECT \
  --bigquery-dataset=$BIGQUERY_DATASET \
  --bigquery-table=$BIGQUERY_TABLE \
@@ -28,9 +28,10 @@ python batch_tile_images.py --input gs://$INPUT_BUCKET/$INPUT_FOLDER/** \
  --runner=DataflowRunner \
  --num_workers=$NUM_WORKERS \
  --max_num_workers=$MAX_NUM_WORKERS \
- --flexrs_goal=COST_OPTIMIZED \
  --project=$PROJECT \
  --region=$REGION \
  --staging_location=gs://$STAGING_BUCKET/$STAGING_FOLDER \
  --temp_location=gs://$TEMP_BUCKET/$TEMP_FOLDER \
  --job_name=$JOB_NAME
+ #--flexrs_goal=COST_OPTIMIZED \
+ #--initial-import
