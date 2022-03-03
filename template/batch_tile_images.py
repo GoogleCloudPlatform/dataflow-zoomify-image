@@ -107,7 +107,7 @@ class UploadImageToGCS(DoFnWithGCSClientMultithread):
         try:
             self.executor.submit(
                 lambda x: blob.upload_from_string(
-                    x, content_type="image/jpeg"),
+                    x, content_type="image/jpeg", if_generation_match=0),
                 image_buffer.getvalue()
             )
         except GoogleCloudError as gcp_err:
