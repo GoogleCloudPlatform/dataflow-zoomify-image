@@ -22,6 +22,7 @@ python batch_tile_images.py --input gs://$INPUT_BUCKET$INPUT_FOLDER/** \
  --bigquery-project=$BIGQUERY_PROJECT \
  --bigquery-dataset=$BIGQUERY_DATASET \
  --bigquery-table=$BIGQUERY_TABLE \
+ --bigquery-log-table=$BIGQUERY_LOG_TABLE \
  --final-bucket=$FINAL_BUCKET \
  --extensions=$FILE_EXTENSIONS \
  --requirements_file requirements.txt \

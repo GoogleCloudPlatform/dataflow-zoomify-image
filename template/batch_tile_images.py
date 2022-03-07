@@ -25,7 +25,7 @@ from concurrent.futures import ThreadPoolExecutor
 from typing import Generator, List, NamedTuple
 from itertools import count
 
-from PIL import Image, ImageOps, ImageFile
+from PIL import Image, ImageOps, ImageFile, UnidentifiedImageError
 
 import requests
 
@@ -41,15 +41,15 @@ from apache_beam.options.pipeline_options import SetupOptions
 from google.cloud import storage
 from google.cloud import bigquery
 from google.cloud.exceptions import GoogleCloudError
-
-# Ignore DecompressionBombWarning warnings
-warnings.simplefilter('ignore', Image.DecompressionBombWarning)
-
-# Avoid interrupting the flow with truncated images
-ImageFile.LOAD_TRUNCATED_IMAGES = True
+from google.cloud.storage.retry import DEFAULT_RETRY
 
 # Hardcoded tile size
 TILE_SIZE = 256
+
+# Custom retry
+NUM_RETRIES = 100 # "num_retries" is deprecated. In the future, replace with "retry" using the code below
+#custom_retry = DEFAULT_RETRY.with_deadline(360.0)
+#custom_retry = custom_retry.with_delay(initial=1.0, multiplier=3.0, maximum=300.0)
 
 class ImageWithPath(NamedTuple):
     """ImageWithPath is a NamedTuple indicating a PIL image
@@ -107,7 +107,7 @@ class UploadImageToGCS(DoFnWithGCSClientMultithread):
         try:
             self.executor.submit(
                 lambda x: blob.upload_from_string(
-                    x, content_type="image/jpeg"),
+                    x, content_type="image/jpeg", num_retries=NUM_RETRIES),
                 image_buffer.getvalue()
             )
         except GoogleCloudError as gcp_err:
@@ -249,6 +249,8 @@ def split_path(path_str: str):
 
 def by_extension(element: FileMetadata, extensions: List[str]) -> bool:
     """Check if extension of element is in extensions."""
+    if element.path.startswith('gs://cria-images/herbaria/UFRN/') or element.path.startswith('gs://cria-images/herbaria/UB/') or element.path.startswith('gs://cria-images/herbaria/UEC/') or element.path.startswith('gs://cria-images/herbaria/FMNH-SEEDPLANTS/') or element.path.startswith('gs://cria-images/herbaria/NY/') or element.path.startswith('gs://cria-images/herbaria/US/') or element.path.startswith('gs://cria-images/herbaria/MBM/') or element.path.startswith('gs://cria-images/herbaria/NL-BOTANY/') or element.path.startswith('gs://cria-images/herbaria/INPA/') or element.path.startswith('gs://cria-images/herbaria/HUEFS/') or element.path.startswith('gs://cria-images/herbaria/R/') or element.path.startswith('gs://cria-images/herbaria/CEN/') or element.path.startswith('gs://cria-images/herbaria/ESA/') or element.path.startswith('gs://cria-images/herbaria/FURB/'):
+        return False
     ext = element.path.split(".")[-1]
     return ext.lower() in extensions
 
@@ -260,7 +262,7 @@ class ReadImage(beam.DoFn):
         # pylint: disable=attribute-defined-outside-init
         self.client = storage.Client()
 
-    def process(self, element, input_path: str, output_path: str):
+    def process(self, element, input_path: str, output_path: str, log_table: str):
         img_input_path = element["files"][0].path
         directory, filename = os.path.split(img_input_path)
         name, extension = os.path.splitext(filename)
@@ -273,8 +275,27 @@ class ReadImage(beam.DoFn):
         blob = self.client.bucket(input_bucket_name).get_blob(target_key)
 
         # Read image
+        # Ignore DecompressionBombWarning
+        Image.MAX_IMAGE_PIXELS = None
+        warnings.simplefilter('ignore', Image.DecompressionBombWarning)
+        # Avoid interrupting the flow with truncated images
+        ImageFile.LOAD_TRUNCATED_IMAGES = True
         gcs = gcsio.GcsIO()
-        image = Image.open(gcs.open(img_input_path)).convert("RGB")
+        image = None
+        try:
+            image = Image.open(gcs.open(img_input_path)).convert("RGB")
+        except UnidentifiedImageError:
+            issued = datetime.now()
+            msg = f"Unable to open image: {img_input_path}"
+            logging.info(msg)
+            bq_client = bigquery.Client()
+            query = f"INSERT INTO `{log_table}` (issued, message) VALUES ('{issued}', '{msg}')"
+            query_job = bq_client.query(query)
+            try:
+                query_job.result()
+            except GoogleCloudError as error:
+                print(error)
+            return
         image = ImageOps.exif_transpose(image)
         element["parameters"] = {
             "image": image,
@@ -405,6 +426,10 @@ def main(argv=None, save_main_session=True):
         dest='bigquery_table',
         help='Bigquery table name.')
     parser.add_argument(
+        '--bigquery-log-table',
+        dest='bigquery_log_table',
+        help='Bigquery log table name.')
+    parser.add_argument(
         '--final-bucket',
         dest='final_bucket',
         help='Final bucket destination for input images.')
@@ -432,6 +457,12 @@ def main(argv=None, save_main_session=True):
         f"{known_args.bigquery_project}."
         f"{known_args.bigquery_dataset}."
         f"{known_args.bigquery_table}"
+    )
+
+    bigquery_log_table = (
+        f"{known_args.bigquery_project}."
+        f"{known_args.bigquery_dataset}."
+        f"{known_args.bigquery_log_table}"
     )
 
     # pylint: disable=protected-access
@@ -503,7 +534,8 @@ def main(argv=None, save_main_session=True):
             | "Read images to memory" >> beam.ParDo(
                 ReadImage(),
                 input_path=os.path.split(known_args.input)[0],
-                output_path=known_args.output)
+                output_path=known_args.output,
+                log_table=bigquery_log_table)
             | "Generate tiles" >> beam.ParDo(
                 GenerateTiles(),
                 known_args.final_bucket

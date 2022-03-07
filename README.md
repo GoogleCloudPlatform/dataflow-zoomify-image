@@ -6,11 +6,12 @@ This repository contains a Google Cloud Dataflow template that can be used to ti
 
 1. Clone it from GitHub.
 2. Create a BigQuery project/dataset/table with the following fields: barcode (str), imagecode (str), extension (str), path (str), width (int), height (int), md5 (str), modified (timestamp).
-3. Edit the `export_variables.sh` file inside the `template` folder with your variables, creating the buckets if necessary.
-4. The service account used in GOOGLE_APPLICATION_CREDENTIALS needs the right permissions (Dataflow, Cloud Storage and BigQuery).
-5. Upload sample images to your INPUT_BUCKET.
-6. Enter the `template` folder and run `venv_prepare.sh` to prepare the environment.
-7. Run `run_batch.sh` to start the Dataflow pipeline.
+3. Create another BigQuery table to store log messages with the following fields: issued (timestamp), message (string).
+4. Edit the `export_variables.sh` file inside the `template` folder with your variables, creating the buckets if necessary.
+5. The service account used in GOOGLE_APPLICATION_CREDENTIALS needs the right permissions (Dataflow, Cloud Storage and BigQuery).
+6. Upload sample images to your INPUT_BUCKET.
+7. Enter the `template` folder and run `venv_prepare.sh` to prepare the environment.
+8. Run `run_batch.sh` to start the Dataflow pipeline.
 
 ## How it works
 
