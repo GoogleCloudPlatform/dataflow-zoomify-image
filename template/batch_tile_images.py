@@ -249,8 +249,6 @@ def split_path(path_str: str):
 
 def by_extension(element: FileMetadata, extensions: List[str]) -> bool:
     """Check if extension of element is in extensions."""
-    if element.path.startswith('gs://cria-images/herbaria/UFRN/') or element.path.startswith('gs://cria-images/herbaria/UB/') or element.path.startswith('gs://cria-images/herbaria/UEC/') or element.path.startswith('gs://cria-images/herbaria/FMNH-SEEDPLANTS/') or element.path.startswith('gs://cria-images/herbaria/NY/') or element.path.startswith('gs://cria-images/herbaria/US/') or element.path.startswith('gs://cria-images/herbaria/MBM/') or element.path.startswith('gs://cria-images/herbaria/NL-BOTANY/') or element.path.startswith('gs://cria-images/herbaria/INPA/') or element.path.startswith('gs://cria-images/herbaria/HUEFS/') or element.path.startswith('gs://cria-images/herbaria/R/') or element.path.startswith('gs://cria-images/herbaria/CEN/') or element.path.startswith('gs://cria-images/herbaria/ESA/') or element.path.startswith('gs://cria-images/herbaria/FURB/'):
-        return False
     ext = element.path.split(".")[-1]
     return ext.lower() in extensions
 
