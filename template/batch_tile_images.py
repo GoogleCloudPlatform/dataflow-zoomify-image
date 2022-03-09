@@ -252,6 +252,17 @@ def by_extension(element: FileMetadata, extensions: List[str]) -> bool:
     ext = element.path.split(".")[-1]
     return ext.lower() in extensions
 
+def log_message(log_table: str, msg: str):
+    issued = datetime.now()
+    logging.info(msg)
+    bq_client = bigquery.Client()
+    query = f"INSERT INTO `{log_table}` (issued, message) VALUES ('{issued}', '{msg}')"
+    query_job = bq_client.query(query)
+    try:
+        query_job.result()
+    except GoogleCloudError as error:
+        print(error)
+
 
 class ReadImage(beam.DoFn):
     """Reads image from a path in GCS
@@ -283,16 +294,8 @@ class ReadImage(beam.DoFn):
         try:
             image = Image.open(gcs.open(img_input_path)).convert("RGB")
         except UnidentifiedImageError:
-            issued = datetime.now()
             msg = f"Unable to open image: {img_input_path}"
-            logging.info(msg)
-            bq_client = bigquery.Client()
-            query = f"INSERT INTO `{log_table}` (issued, message) VALUES ('{issued}', '{msg}')"
-            query_job = bq_client.query(query)
-            try:
-                query_job.result()
-            except GoogleCloudError as error:
-                print(error)
+            log_message(log_table, msg)
             return
         image = ImageOps.exif_transpose(image)
         element["parameters"] = {
@@ -313,7 +316,7 @@ class CheckMD5(beam.DoFn):
     def setup(self):
         self.client = storage.Client()
 
-    def process(self, element, final_bucket: str):
+    def process(self, element, final_bucket: str, log_table: str):
         # Get image names
         img_input_path = element["files"][0].path
         # Compare input image md5 with bq
@@ -323,6 +326,7 @@ class CheckMD5(beam.DoFn):
         if blob.md5_hash != element["bq_metadata"][0]["md5"]:
             element["md5"] = True
             if input_bucket_name != final_bucket:
+                # Remove existing image that will be updated
                 orig_key = (
                     element["bq_metadata"][0]["path"]
                     + os.path.sep
@@ -336,10 +340,12 @@ class CheckMD5(beam.DoFn):
                     print(error)
         else:
             element["md5"] = False
-            # Delete input blob
             if input_bucket_name != final_bucket:
+                # Remove input image identical to existing image
                 try:
                     blob.delete()
+                    msg = f"Discarded identical image: {img_input_path}"
+                    log_message(log_table, msg)
                 except GoogleCloudError as error:
                     print(error)
         yield element
@@ -517,7 +523,7 @@ def main(argv=None, save_main_session=True):
         # Check which files with metadata in BigQuery are new
         files_in_bq_new = (
             files_in_bq
-            | "Check MD5" >> beam.ParDo(CheckMD5(),known_args.final_bucket)
+            | "Check MD5" >> beam.ParDo(CheckMD5(), known_args.final_bucket, bigquery_log_table)
             | "Filter same files" >> beam.Filter(lambda x: x["md5"])
         )
 
