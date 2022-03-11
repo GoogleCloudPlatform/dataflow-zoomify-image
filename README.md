@@ -36,7 +36,7 @@ and is moved to:
 
     gs://final-bucket/mypath/test.jpg
 
-Image viewers, like OpenSeaDragon, can then be configured to display the zoomified image, loading different sets of tiles at different zoom levels.
+Image viewers, like [OpenSeadragon](https://openseadragon.github.io/), can then be configured to display the zoomified image, loading different sets of tiles at different zoom levels.
 
 ## Dataflow pipeline graph
 
