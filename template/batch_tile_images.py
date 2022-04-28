@@ -47,9 +47,7 @@ from google.cloud.storage.retry import DEFAULT_RETRY
 TILE_SIZE = 256
 
 # Custom retry
-NUM_RETRIES = 100 # "num_retries" is deprecated. In the future, replace with "retry" using the code below
-#custom_retry = DEFAULT_RETRY.with_deadline(360.0)
-#custom_retry = custom_retry.with_delay(initial=1.0, multiplier=3.0, maximum=300.0)
+NUM_RETRIES = 100 # "num_retries" parameter is deprecated. In the future, replace with "retry" using the code below
 
 class ImageWithPath(NamedTuple):
     """ImageWithPath is a NamedTuple indicating a PIL image
@@ -156,6 +154,8 @@ class GenerateTiles(beam.DoFn):
     def setup(self):
         # pylint: disable=attribute-defined-outside-init
         self.client = storage.Client()
+        self.custom_retry = DEFAULT_RETRY.with_deadline(360.0)
+        self.custom_retry = custom_retry.with_delay(initial=1.0, multiplier=3.0, maximum=300.0)
 
     def process(
         self,
@@ -168,7 +168,7 @@ class GenerateTiles(beam.DoFn):
             # Remove existing tiles if they exist
             blobs = list(bucket.list_blobs(prefix=target_key))
             try:
-                bucket.delete_blobs(blobs)
+                bucket.delete_blobs(blobs, retry=self.custom_retry)
             except GoogleCloudError as error:
                 print(error)
 
@@ -231,7 +231,7 @@ class GenerateTiles(beam.DoFn):
                 self.client.bucket(final_bucket),
                 target_key)
             try:
-                input_blob.delete()
+                input_blob.delete(retry=self.custom_retry)
             except GoogleCloudError as error:
                 print(error)
 
@@ -315,6 +315,8 @@ class CheckMD5(beam.DoFn):
     """Checks MD5 hash"""
     def setup(self):
         self.client = storage.Client()
+        self.custom_retry = DEFAULT_RETRY.with_deadline(360.0)
+        self.custom_retry = custom_retry.with_delay(initial=1.0, multiplier=3.0, maximum=300.0)
 
     def process(self, element, final_bucket: str, log_table: str):
         # Get image names
@@ -335,7 +337,7 @@ class CheckMD5(beam.DoFn):
                 orig_blob = self.client.bucket(
                     final_bucket).blob(orig_key)
                 try:
-                    orig_blob.delete()
+                    orig_blob.delete(retry=self.custom_retry)
                 except GoogleCloudError as error:
                     print(error)
         else:
@@ -343,7 +345,7 @@ class CheckMD5(beam.DoFn):
             if input_bucket_name != final_bucket:
                 # Remove input image identical to existing image
                 try:
-                    blob.delete()
+                    blob.delete(retry=self.custom_retry)
                     msg = f"Discarded identical image: {img_input_path}"
                     log_message(log_table, msg)
                 except GoogleCloudError as error:
