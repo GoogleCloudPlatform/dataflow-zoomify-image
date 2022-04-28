@@ -465,11 +465,14 @@ def main(argv=None, save_main_session=True):
         f"{known_args.bigquery_table}"
     )
 
-    bigquery_log_table = (
-        f"{known_args.bigquery_project}."
-        f"{known_args.bigquery_dataset}."
-        f"{known_args.bigquery_log_table}"
-    )
+    bigquery_log_table = (f"{known_args.bigquery_log_table}")
+
+    if '.' not in known_args.bigquery_log_table:
+        bigquery_log_table = (
+            f"{known_args.bigquery_project}."
+            f"{known_args.bigquery_dataset}."
+            f"{known_args.bigquery_log_table}"
+        )
 
     # pylint: disable=protected-access
     bigquery_table_schema = bigquery.Client().get_table(
