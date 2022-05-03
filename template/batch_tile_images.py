@@ -155,7 +155,7 @@ class GenerateTiles(beam.DoFn):
         # pylint: disable=attribute-defined-outside-init
         self.client = storage.Client()
         self.custom_retry = DEFAULT_RETRY.with_deadline(360.0)
-        self.custom_retry = custom_retry.with_delay(initial=1.0, multiplier=3.0, maximum=300.0)
+        self.custom_retry = self.custom_retry.with_delay(initial=1.0, multiplier=3.0, maximum=300.0)
 
     def process(
         self,
@@ -316,7 +316,7 @@ class CheckMD5(beam.DoFn):
     def setup(self):
         self.client = storage.Client()
         self.custom_retry = DEFAULT_RETRY.with_deadline(360.0)
-        self.custom_retry = custom_retry.with_delay(initial=1.0, multiplier=3.0, maximum=300.0)
+        self.custom_retry = self.custom_retry.with_delay(initial=1.0, multiplier=3.0, maximum=300.0)
 
     def process(self, element, final_bucket: str, log_table: str):
         # Get image names
