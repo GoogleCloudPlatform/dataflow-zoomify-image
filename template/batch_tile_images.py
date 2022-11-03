@@ -270,6 +270,8 @@ class ReadImage(beam.DoFn):
     def setup(self):
         # pylint: disable=attribute-defined-outside-init
         self.client = storage.Client()
+        self.custom_retry = DEFAULT_RETRY.with_deadline(360.0)
+        self.custom_retry = self.custom_retry.with_delay(initial=1.0, multiplier=3.0, maximum=300.0)
 
     def process(self, element, input_path: str, output_path: str, log_table: str):
         img_input_path = element["files"][0].path
@@ -281,7 +283,7 @@ class ReadImage(beam.DoFn):
             img_subpath = img_subpath[1:]
         save_to = os.path.join(output_path, img_subpath, name)
         input_bucket_name, target_key = split_path(img_input_path)
-        blob = self.client.bucket(input_bucket_name).get_blob(target_key)
+        blob = self.client.bucket(input_bucket_name).get_blob(target_key, retry=self.custom_retry)
 
         # Read image
         # Ignore DecompressionBombWarning
@@ -328,7 +330,7 @@ class CheckMD5(beam.DoFn):
         # Compare input image md5 with bq
         input_bucket_name, target_key = split_path(img_input_path)
         input_bucket = self.client.bucket(input_bucket_name)
-        blob = input_bucket.get_blob(target_key)
+        blob = input_bucket.get_blob(target_key, retry=self.custom_retry)
         if blob.md5_hash != element["bq_metadata"][0]["md5"]:
             element["md5"] = True
             if input_bucket_name != final_bucket:
@@ -344,6 +346,10 @@ class CheckMD5(beam.DoFn):
                     orig_blob.delete(retry=self.custom_retry)
                 except GoogleCloudError as error:
                     print(error)
+                    error_str = str(error)
+                    orig_path = orig_blob.path
+                    msg = f"Failed to delete image to be updated {orig_path}: {error_str}"
+                    log_message(log_table, msg)
         else:
             element["md5"] = False
             if input_bucket_name != final_bucket:
@@ -354,6 +360,9 @@ class CheckMD5(beam.DoFn):
                     log_message(log_table, msg)
                 except GoogleCloudError as error:
                     print(error)
+                    error_str = str(error)
+                    msg = f"Failed to discard identical image {img_input_path}: {error_str}"
+                    log_message(log_table, msg)
         yield element
 
 
