@@ -47,7 +47,7 @@ from google.cloud.storage.retry import DEFAULT_RETRY
 TILE_SIZE = 256
 
 # Custom retry
-NUM_RETRIES = 100 # "num_retries" parameter is deprecated. In the future, replace with "retry" using the code below
+NUM_RETRIES = 100 # "num_retries" parameter is deprecated!
 
 class ImageWithPath(NamedTuple):
     """ImageWithPath is a NamedTuple indicating a PIL image
@@ -295,6 +295,10 @@ class ReadImage(beam.DoFn):
             image = Image.open(gcs.open(img_input_path)).convert("RGB")
         except UnidentifiedImageError:
             msg = f"Unable to open image: {img_input_path}"
+            log_message(log_table, msg)
+            return
+        except FileNotFoundError:
+            msg = f"Unable to find image: {img_input_path}"
             log_message(log_table, msg)
             return
         image = ImageOps.exif_transpose(image)
