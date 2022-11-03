@@ -65,6 +65,18 @@ class ImageWithPath(NamedTuple):
 # pylint: disable=arguments-differ
 
 
+def log_message(log_table: str, msg: str):
+    issued = datetime.now()
+    logging.info(msg)
+    bq_client = bigquery.Client()
+    query = f"INSERT INTO `{log_table}` (issued, message) VALUES ('{issued}', '{msg}')"
+    query_job = bq_client.query(query)
+    try:
+        query_job.result()
+    except GoogleCloudError as error:
+        print(error)
+
+
 class DoFnWithGCSClientMultithread(beam.DoFn):
     """Abstract for GCS Multithread
     """
@@ -251,17 +263,6 @@ def by_extension(element: FileMetadata, extensions: List[str]) -> bool:
     """Check if extension of element is in extensions."""
     ext = element.path.split(".")[-1]
     return ext.lower() in extensions
-
-def log_message(log_table: str, msg: str):
-    issued = datetime.now()
-    logging.info(msg)
-    bq_client = bigquery.Client()
-    query = f"INSERT INTO `{log_table}` (issued, message) VALUES ('{issued}', '{msg}')"
-    query_job = bq_client.query(query)
-    try:
-        query_job.result()
-    except GoogleCloudError as error:
-        print(error)
 
 
 class ReadImage(beam.DoFn):
