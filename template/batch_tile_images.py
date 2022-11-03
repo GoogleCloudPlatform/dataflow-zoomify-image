@@ -183,6 +183,11 @@ class GenerateTiles(beam.DoFn):
                 bucket.delete_blobs(blobs, retry=self.custom_retry)
             except GoogleCloudError as error:
                 print(error)
+                error_str = str(error)
+                tiles_path = element["parameters"]["save_to"]
+                msg = f"Failed to delete existing tiles {tiles_path}: {error_str}"
+                log_message(log_table, msg)
+
 
         # Generate tiers (downscaled images)
         images = [element["parameters"]["image"]]
@@ -224,9 +229,14 @@ class GenerateTiles(beam.DoFn):
         blob = bucket.blob(target_key)
 
         try:
-            blob.upload_from_string(data)
+            blob.upload_from_string(data, retry=self.custom_retry)
         except GoogleCloudError as error:
             print(error)
+            error_str = str(error)
+            properties_path = blob.path
+            msg = f"Failed to create {properties_path}: {error_str}"
+            log_message(log_table, msg)
+
 
 
         element["parameters"]["modified"] = datetime.now()
