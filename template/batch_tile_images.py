@@ -350,13 +350,8 @@ class CheckMD5(beam.DoFn):
             element["md5"] = True
             if input_bucket_name != final_bucket:
                 # Remove existing image that will be updated
-                orig_key = (
-                    element["bq_metadata"][0]["path"]
-                    + os.path.sep
-                    + element["bq_metadata"][0]["filename"]
-                    )
-                orig_blob = self.client.bucket(
-                    final_bucket).blob(orig_key)
+                orig_key = element["bq_metadata"][0]["path"] + '/' + element["bq_metadata"][0]["filename"]
+                orig_blob = self.client.bucket(final_bucket).blob(orig_key)
                 try:
                     orig_blob.delete(retry=self.custom_retry)
                 except GoogleCloudError as error:
