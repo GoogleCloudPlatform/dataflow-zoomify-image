@@ -304,14 +304,18 @@ class ReadImage(beam.DoFn):
         ImageFile.LOAD_TRUNCATED_IMAGES = True
         gcs = gcsio.GcsIO()
         image = None
-        try:
-            image = Image.open(gcs.open(img_input_path)).convert("RGB")
-        except UnidentifiedImageError:
-            msg = f"Unable to open image: {img_input_path}"
-            log_message(log_table, msg)
-            return
-        except FileNotFoundError:
-            msg = f"Unable to find image: {img_input_path}"
+        n = 0
+        while n < NUM_RETRIES:
+            try:
+                image = Image.open(gcs.open(img_input_path)).convert("RGB")
+                break
+            except UnidentifiedImageError:
+                pass
+            except FileNotFoundError:
+                pass
+            n += 1
+        if image is None:
+            msg = f"Unable to load image: {img_input_path}"
             log_message(log_table, msg)
             return
         image = ImageOps.exif_transpose(image)
