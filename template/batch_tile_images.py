@@ -122,6 +122,9 @@ class UploadImageToGCS(DoFnWithGCSClientMultithread):
             )
         except GoogleCloudError as gcp_err:
             print(gcp_err)
+            gcp_err_str = str(gcp_err)
+            msg = f"Unable to upload image {path}: {gcp_error_str}"
+            log_message(log_table, msg)
         yield "Ok"
 
 
@@ -237,12 +240,10 @@ class GenerateTiles(beam.DoFn):
             msg = f"Failed to create {properties_path}: {error_str}"
             log_message(log_table, msg)
 
-
-
         element["parameters"]["modified"] = datetime.now()
         element["parameters"]["path_in_db"] = os.path.split(output_folder)[0]
-        input_bucket_name, target_key = split_path(
-            element["parameters"]["img_input_path"])
+        img_input_path = element["parameters"]["img_input_path"]
+        input_bucket_name, target_key = split_path(img_input_path)
 
         # Move input image to final destination
         if input_bucket_name != final_bucket:
@@ -256,6 +257,9 @@ class GenerateTiles(beam.DoFn):
                 input_blob.delete(retry=self.custom_retry)
             except GoogleCloudError as error:
                 print(error)
+                error_str = str(error)
+                msg = f"Failed to delete input file after job {img_input_path}: {error_str}"
+                log_message(log_table, msg)
 
         yield beam.pvalue.TaggedOutput(
             f"bq_{element['parameters']['action']}s",
@@ -304,6 +308,7 @@ class ReadImage(beam.DoFn):
         ImageFile.LOAD_TRUNCATED_IMAGES = True
         gcs = gcsio.GcsIO()
         image = None
+        # Manually retry, as there doesn't seem to be a way to configue retries on gcs.open
         n = 0
         while n < NUM_RETRIES:
             try:
@@ -315,9 +320,9 @@ class ReadImage(beam.DoFn):
                 pass
             n += 1
         if image is None:
-            msg = f"Unable to load image: {img_input_path}"
+            msg = f"Unable to read image: {img_input_path}"
             log_message(log_table, msg)
-            return
+            yield None
         image = ImageOps.exif_transpose(image)
         element["parameters"] = {
             "image": image,
@@ -346,19 +351,27 @@ class CheckMD5(beam.DoFn):
         input_bucket_name, target_key = split_path(img_input_path)
         input_bucket = self.client.bucket(input_bucket_name)
         blob = input_bucket.get_blob(target_key, retry=self.custom_retry)
+        if blob is None:
+            # TODO: figure out why sometimes the blob being processed doesn't exist (??)
+            msg = f"Could not find image being processed {img_input_path}"
+            log_message(log_table, msg)
+            yield None
         if blob.md5_hash != element["bq_metadata"][0]["md5"]:
             element["md5"] = True
             if input_bucket_name != final_bucket:
                 # Remove existing image that will be updated
                 orig_key = element["bq_metadata"][0]["path"] + '/' + element["bq_metadata"][0]["filename"]
-                orig_blob = self.client.bucket(final_bucket).blob(orig_key)
-                try:
-                    orig_blob.delete(retry=self.custom_retry)
-                except GoogleCloudError as error:
-                    print(error)
-                    error_str = str(error)
-                    orig_path = orig_blob.path
-                    msg = f"Failed to delete image to be updated {orig_path}: {error_str}"
+                orig_blob = self.client.bucket(final_bucket).get_blob(orig_key, retry=self.custom_retry)
+                if orig_blob:
+                    try:
+                        orig_blob.delete(retry=self.custom_retry)
+                    except GoogleCloudError as error:
+                        print(error)
+                        error_str = str(error)
+                        msg = f"Failed to delete image to be updated {final_bucket}/{orig_key}: {error_str}"
+                        log_message(log_table, msg)
+                else:
+                    msg = f"Could not find outdated image to be deleted {final_bucket}/{orig_key}"
                     log_message(log_table, msg)
         else:
             element["md5"] = False
@@ -552,6 +565,7 @@ def main(argv=None, save_main_session=True):
         files_in_bq_new = (
             files_in_bq
             | "Check MD5" >> beam.ParDo(CheckMD5(), known_args.final_bucket, bigquery_log_table)
+            | 'Filter out missing files' >> beam.Filter(lambda x: x is not None)
             | "Filter same files" >> beam.Filter(lambda x: x["md5"])
         )
 
@@ -568,6 +582,7 @@ def main(argv=None, save_main_session=True):
                 input_path=os.path.split(known_args.input)[0],
                 output_path=known_args.output,
                 log_table=bigquery_log_table)
+            | 'Filter out unread files' >> beam.Filter(lambda x: x is not None)
             | "Generate tiles" >> beam.ParDo(
                 GenerateTiles(),
                 known_args.final_bucket
