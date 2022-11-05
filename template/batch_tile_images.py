@@ -322,7 +322,7 @@ class ReadImage(beam.DoFn):
         if image is None:
             msg = f"Unable to read image: {img_input_path}"
             log_message(log_table, msg)
-            yield None
+            return None
         image = ImageOps.exif_transpose(image)
         element["parameters"] = {
             "image": image,
@@ -355,7 +355,7 @@ class CheckMD5(beam.DoFn):
             # TODO: figure out why sometimes the blob being processed doesn't exist (??)
             msg = f"Could not find image being processed {img_input_path}"
             log_message(log_table, msg)
-            yield None
+            return None
         if blob.md5_hash != element["bq_metadata"][0]["md5"]:
             element["md5"] = True
             if input_bucket_name != final_bucket:
