@@ -49,6 +49,8 @@ TILE_SIZE = 256
 # Custom retry
 NUM_RETRIES = 100 # "num_retries" parameter is deprecated!
 
+LOGGER = logging.getLogger(__name__)
+
 class ImageWithPath(NamedTuple):
     """ImageWithPath is a NamedTuple indicating a PIL image
     and a path
@@ -67,7 +69,7 @@ class ImageWithPath(NamedTuple):
 
 def log_message(log_table: str, msg: str):
     issued = datetime.now()
-    logging.info(msg)
+    LOGGER.info(msg)
     bq_client = bigquery.Client()
     query = f"INSERT INTO `{log_table}` (issued, message) VALUES ('{issued}', '{msg}')"
     query_job = bq_client.query(query)
@@ -651,5 +653,4 @@ def main(argv=None, save_main_session=True):
 
 
 if __name__ == "__main__":
-    logging.getLogger().setLevel(logging.INFO)
     main()
