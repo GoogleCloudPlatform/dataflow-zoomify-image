@@ -49,7 +49,6 @@ TILE_SIZE = 256
 # Custom retry
 NUM_RETRIES = 100 # "num_retries" parameter is deprecated!
 
-LOGGER = logging.getLogger(__name__)
 
 class ImageWithPath(NamedTuple):
     """ImageWithPath is a NamedTuple indicating a PIL image
@@ -67,9 +66,8 @@ class ImageWithPath(NamedTuple):
 # pylint: disable=arguments-differ
 
 
-def log_message(log_table: str, msg: str):
+def notify_issue(log_table: str, msg: str):
     issued = datetime.now()
-    LOGGER.info(msg)
     bq_client = bigquery.Client()
     query = f"INSERT INTO `{log_table}` (issued, message) VALUES ('{issued}', '{msg}')"
     query_job = bq_client.query(query)
@@ -123,10 +121,10 @@ class UploadImageToGCS(DoFnWithGCSClientMultithread):
                 image_buffer.getvalue()
             )
         except GoogleCloudError as gcp_err:
-            print(gcp_err)
             gcp_err_str = str(gcp_err)
             msg = f"Unable to upload image {path}: {gcp_error_str}"
-            log_message(log_table, msg)
+            logging.error(msg)
+            notify_issue(log_table, msg)
         yield "Ok"
 
 
@@ -145,6 +143,8 @@ def tile_image(
         image_tiles (List[ImageWithPath]) : A list of tiles with path.
     """
     image_tiles = []
+
+    logging.info("Tiling image %s", prefix)
 
     for top in range(0, image.size[1], TILE_SIZE):
         bottom = min(image.size[1], top + TILE_SIZE)
@@ -181,20 +181,21 @@ class GenerateTiles(beam.DoFn):
         """Generate tiles."""
         bucket_name, target_key = split_path(element["parameters"]["save_to"])
         bucket = self.client.bucket(bucket_name)
+        tiles_path = element["parameters"]["save_to"]
         if element["parameters"]["action"] == "update":
             # Remove existing tiles if they exist
             blobs = list(bucket.list_blobs(prefix=target_key))
             try:
                 bucket.delete_blobs(blobs, retry=self.custom_retry)
+                logging.info("Deleted existing tiles for %s", tiles_path)
             except GoogleCloudError as error:
-                print(error)
                 error_str = str(error)
-                tiles_path = element["parameters"]["save_to"]
                 msg = f"Failed to delete existing tiles {tiles_path}: {error_str}"
-                log_message(log_table, msg)
-
+                logging.warning(msg)
+                notify_issue(log_table, msg)
 
         # Generate tiers (downscaled images)
+        logging.info("Tiling %s", tiles_path)
         images = [element["parameters"]["image"]]
         width, height = element["parameters"]["image"].size
 
@@ -232,15 +233,15 @@ class GenerateTiles(beam.DoFn):
             f"gs://{bucket_name}/","")
         target_key = output_folder + "/ImageProperties.xml"
         blob = bucket.blob(target_key)
-
+        properties_path = blob.path
         try:
             blob.upload_from_string(data, retry=self.custom_retry)
+            logging.info("Created %s", properties_path)
         except GoogleCloudError as error:
-            print(error)
             error_str = str(error)
-            properties_path = blob.path
             msg = f"Failed to create {properties_path}: {error_str}"
-            log_message(log_table, msg)
+            logging.error(msg)
+            notify_issue(log_table, msg)
 
         element["parameters"]["modified"] = datetime.now()
         element["parameters"]["path_in_db"] = os.path.split(output_folder)[0]
@@ -251,17 +252,25 @@ class GenerateTiles(beam.DoFn):
         if input_bucket_name != final_bucket:
             input_bucket = self.client.bucket(input_bucket_name)
             input_blob = input_bucket.blob(target_key)
-            _ = input_bucket.copy_blob(
-                input_blob,
-                self.client.bucket(final_bucket),
-                target_key)
+            try:
+                _ = input_bucket.copy_blob(
+                    input_blob,
+                    self.client.bucket(final_bucket),
+                    target_key)
+                logging.info("Copied %s to %s", img_input_path, final_bucket)
+            except GoogleCloudError as error:
+                error_str = str(error)
+                msg = f"Failed to copy {img_input_path} to {final_bucket}: {error_str}"
+                logging.error(msg)
+                notify_issue(log_table, msg)
             try:
                 input_blob.delete(retry=self.custom_retry)
+                logging.info("Removed input image %s", img_input_path)
             except GoogleCloudError as error:
-                print(error)
                 error_str = str(error)
                 msg = f"Failed to delete input file after job {img_input_path}: {error_str}"
-                log_message(log_table, msg)
+                logging.warn(msg)
+                notify_issue(log_table, msg)
 
         yield beam.pvalue.TaggedOutput(
             f"bq_{element['parameters']['action']}s",
@@ -310,21 +319,19 @@ class ReadImage(beam.DoFn):
         ImageFile.LOAD_TRUNCATED_IMAGES = True
         gcs = gcsio.GcsIO()
         image = None
-        # Manually retry, as there doesn't seem to be a way to configue retries on gcs.open
-        n = 0
-        while n < NUM_RETRIES:
-            try:
-                image = Image.open(gcs.open(img_input_path)).convert("RGB")
-                break
-            except UnidentifiedImageError:
-                pass
-            except FileNotFoundError:
-                pass
-            n += 1
+        # note: are there retries in gcs.open??
+        try:
+            image = Image.open(gcs.open(img_input_path)).convert("RGB")
+        except UnidentifiedImageError:
+            pass
+        except FileNotFoundError:
+            pass
         if image is None:
             msg = f"Unable to read image: {img_input_path}"
-            log_message(log_table, msg)
+            logging.error(msg)
+            notifyu_issue(log_table, msg)
             return None
+        logging.info("Read image %s", img_input_path)
         image = ImageOps.exif_transpose(image)
         element["parameters"] = {
             "image": image,
@@ -356,9 +363,11 @@ class CheckMD5(beam.DoFn):
         if blob is None:
             # TODO: figure out why sometimes the blob being processed doesn't exist (??)
             msg = f"Could not find image being processed {img_input_path}"
-            log_message(log_table, msg)
+            logging.error(msg)
+            notify_issue(log_table, msg)
             return None
         if blob.md5_hash != element["bq_metadata"][0]["md5"]:
+            logging.info("Detected change in %s", img_input_path)
             element["md5"] = True
             if input_bucket_name != final_bucket:
                 # Remove existing image that will be updated
@@ -367,27 +376,32 @@ class CheckMD5(beam.DoFn):
                 if orig_blob:
                     try:
                         orig_blob.delete(retry=self.custom_retry)
+                        logging.info("Deleted image to be updated %s/%s", final_bucket, orig_key)
                     except GoogleCloudError as error:
-                        print(error)
                         error_str = str(error)
                         msg = f"Failed to delete image to be updated {final_bucket}/{orig_key}: {error_str}"
-                        log_message(log_table, msg)
+                        logging.warn(msg)
+                        notify_issue(log_table, msg)
                 else:
                     msg = f"Could not find outdated image to be deleted {final_bucket}/{orig_key}"
-                    log_message(log_table, msg)
+                    logging.warn(msg)
+                    notify_issue(log_table, msg)
         else:
+            logging.info("Existing image is the same for %s", img_input_path)
             element["md5"] = False
             if input_bucket_name != final_bucket:
                 # Remove input image identical to existing image
                 try:
                     blob.delete(retry=self.custom_retry)
                     msg = f"Discarded identical image: {img_input_path}"
-                    log_message(log_table, msg)
+                    logging.info(msg)
+                    notify_issue(log_table, msg)
                 except GoogleCloudError as error:
                     print(error)
                     error_str = str(error)
                     msg = f"Failed to discard identical image {img_input_path}: {error_str}"
-                    log_message(log_table, msg)
+                    logging.warn(msg)
+                    notify_issue(log_table, msg)
         yield element
 
 
