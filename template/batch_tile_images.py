@@ -106,7 +106,7 @@ class UploadImageToGCS(DoFnWithGCSClientMultithread):
     Image must be JPEG.
     """
 
-    def process(self, element: ImageWithPath):
+    def process(self, element: ImageWithPath, log_table: str):
         """Uploads image to GCS."""
         path = element.path
         image_buffer = BytesIO()
@@ -177,7 +177,8 @@ class GenerateTiles(beam.DoFn):
     def process(
         self,
         element,
-        final_bucket: str):
+        final_bucket: str,
+        log_table: str):
         """Generate tiles."""
         bucket_name, target_key = split_path(element["parameters"]["save_to"])
         bucket = self.client.bucket(bucket_name)
@@ -329,7 +330,7 @@ class ReadImage(beam.DoFn):
         if image is None:
             msg = f"Unable to read image: {img_input_path}"
             logging.error(msg)
-            notifyu_issue(log_table, msg)
+            notify_issue(log_table, msg)
             return None
         logging.info("Read image %s", img_input_path)
         image = ImageOps.exif_transpose(image)
@@ -601,7 +602,8 @@ def main(argv=None, save_main_session=True):
             | 'Filter out unread files' >> beam.Filter(lambda x: x is not None)
             | "Generate tiles" >> beam.ParDo(
                 GenerateTiles(),
-                known_args.final_bucket
+                known_args.final_bucket, 
+                log_table=bigquery_log_table
                 ).with_outputs(
                     "tiles",
                     "bq_inserts",
@@ -613,7 +615,10 @@ def main(argv=None, save_main_session=True):
         _ = (
             tiling_results["tiles"]
             | "Reshuffle" >> beam.Reshuffle()
-            | "Upload tiles to GCS" >> beam.ParDo(UploadImageToGCS())
+            | "Upload tiles to GCS" >> beam.ParDo(
+                UploadImageToGCS(), 
+                log_table=bigquery_log_table
+                )
         )
 
         # Insert new files metadata into Bigquery
