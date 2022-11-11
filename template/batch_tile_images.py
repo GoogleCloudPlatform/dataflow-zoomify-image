@@ -288,7 +288,10 @@ def split_path(path_str: str):
 def by_extension(element: FileMetadata, extensions: List[str]) -> bool:
     """Check if extension of element is in extensions."""
     ext = element.path.split(".")[-1]
-    return ext.lower() in extensions
+    if ext.lower() in extensions:
+        logging.info("Selected image %s", element.path)
+        return True
+    return False
 
 
 class ReadImage(beam.DoFn):
@@ -377,14 +380,14 @@ class CheckMD5(beam.DoFn):
                 if orig_blob:
                     try:
                         orig_blob.delete(retry=self.custom_retry)
-                        logging.info("Deleted image to be updated %s/%s", final_bucket, orig_key)
+                        logging.info("Deleted image to be updated gs://%s/%s", final_bucket, orig_key)
                     except GoogleCloudError as error:
                         error_str = str(error)
-                        msg = f"Failed to delete image to be updated {final_bucket}/{orig_key}: {error_str}"
+                        msg = f"Failed to delete image to be updated gs://{final_bucket}/{orig_key}: {error_str}"
                         logging.warn(msg)
                         notify_issue(log_table, msg)
                 else:
-                    msg = f"Could not find outdated image to be deleted {final_bucket}/{orig_key}"
+                    msg = f"Could not find outdated image to be deleted gs://{final_bucket}/{orig_key}"
                     logging.warn(msg)
                     notify_issue(log_table, msg)
         else:
