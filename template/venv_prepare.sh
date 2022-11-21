@@ -19,5 +19,5 @@ sudo apt install -y python3-venv
 python3 -m venv venv
 source venv/bin/activate
 pip install -U pip
-pip install apache-beam[gcp] Pillow
+pip install apache-beam[gcp]<=2.42.0 Pillow
 pip install -r requirements.txt
